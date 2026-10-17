@@ -23,27 +23,31 @@ enum DeviceState {
 }
 
 enum ErrorCode {
-  ERROR_CODE_UNSPECIFIED      = 0;
-  ERROR_CODE_INVALID_MESSAGE  = 1;
-  ERROR_CODE_INTERNAL         = 2;
-  ERROR_CODE_SFU              = 3;
+  ERROR_CODE_UNSPECIFIED       = 0;
+  ERROR_CODE_INVALID_MESSAGE   = 1;
+  ERROR_CODE_INTERNAL          = 2;
+  ERROR_CODE_SFU               = 3;
 
   // Devices
-  ERROR_CODE_WAKE_STALE       = 10; // The offer came after sleep.
-  ERROR_CODE_WAKE_TIMEOUT     = 11; // No ready in time.
-  ERROR_CODE_DEVICE_STOPPED   = 12;
-  ERROR_CODE_ROOM_FULL        = 13;
-  ERROR_CODE_ROOM_UNAVAILABLE = 14;
+  ERROR_CODE_WAKE_STALE        = 10; // The offer came after sleep.
+  ERROR_CODE_WAKE_TIMEOUT      = 11; // No ready in time.
+  ERROR_CODE_DEVICE_STOPPED    = 12;
+  ERROR_CODE_ROOM_FULL         = 13;
+  ERROR_CODE_ROOM_UNAVAILABLE  = 14;
 
   // Viewers
-  ERROR_CODE_BUSY             = 20; // Answer the last offer first.
-  ERROR_CODE_NO_OFFER         = 21;
-  ERROR_CODE_NOT_MEMBER       = 22;
-  ERROR_CODE_NOT_LIVE         = 23;
-  ERROR_CODE_VIEWER_LIMIT     = 24;
-  ERROR_CODE_TRACK_NOT_FOUND  = 25;
-  ERROR_CODE_TRACK_NOT_READY  = 26;
-  ERROR_CODE_VIEWER_GONE      = 27; // Join again.
+  ERROR_CODE_BUSY              = 20; // Answer the last offer first.
+  ERROR_CODE_NO_OFFER          = 21;
+  ERROR_CODE_NOT_MEMBER        = 22;
+  ERROR_CODE_NOT_LIVE          = 23;
+  ERROR_CODE_VIEWER_LIMIT      = 24;
+  ERROR_CODE_TRACK_NOT_FOUND   = 25;
+  ERROR_CODE_TRACK_NOT_READY   = 26;
+  ERROR_CODE_VIEWER_GONE       = 27; // Join again.
+  ERROR_CODE_NO_DATA_CHANNELS  = 28;
+  ERROR_CODE_DATA_CHANNELS_OFF = 29; // The token has no data_channels.
+  ERROR_CODE_NOT_CONTROLLER    = 30;
+  ERROR_CODE_CONTROL_TIMEOUT   = 31; // No control_ready in time.
 }
 
 message SignalError {
@@ -59,6 +63,16 @@ message IceServer {
   repeated string urls       = 1;
   string          username   = 2;
   string          credential = 3;
+}
+
+message DataChannel {
+  string label = 1; // "_lossy" (unordered, no retransmits) or "_reliable" (ordered).
+  uint32 id    = 2; // Negotiated stream id in this PeerConnection.
+}
+
+message ViewerRef {
+  string room      = 1;
+  string viewer_id = 2;
 }
 
 // ── Devices ─────────────────────────────────────────────────────────────────
@@ -84,8 +98,9 @@ message Sleep {}
 
 // The worker replies to each offer with PublishAnswer or an error. Use only the last reply.
 message PublishOffer {
-  string                sdp    = 1;
-  repeated PublishTrack tracks = 2;
+  string                sdp           = 1;
+  repeated PublishTrack tracks        = 2;
+  bool                  data_channels = 3; // Open _lossy and _reliable. The offer needs channel "server-events" (id 0).
 }
 
 message PublishAnswer {
@@ -96,6 +111,16 @@ message PublishAnswer {
 // The PeerConnection is connected.
 message Ready {}
 
+// The ids of _lossy and _reliable.
+message DeviceChannels {
+  repeated DataChannel channels = 1;
+}
+
+// Who controls the device. Unset: nobody.
+message ControlChanged {
+  ViewerRef controller = 1;
+}
+
 message DeviceRequest {
   oneof message {
     PublishOffer offer = 1;
@@ -105,22 +130,28 @@ message DeviceRequest {
 
 message DeviceResponse {
   oneof message {
-    DeviceJoined  joined = 1;
-    Wake          wake   = 2;
-    PublishAnswer answer = 3;
-    Sleep         sleep  = 4;
-    SignalError   error  = 5;
+    DeviceJoined   joined   = 1;
+    Wake           wake     = 2;
+    PublishAnswer  answer   = 3;
+    Sleep          sleep    = 4;
+    SignalError    error    = 5;
+    DeviceChannels channels = 6;
+    ControlChanged control  = 7;
   }
 }
 
 // ── Viewers ─────────────────────────────────────────────────────────────────
 
 message DeviceInfo {
-  string          device_id  = 1;
-  DeviceState     state      = 2;
-  uint32          generation = 3;
-  repeated string tracks     = 4; // Set while live.
-  ErrorCode       last_error = 5;
+  string             device_id     = 1;
+  DeviceState        state         = 2;
+  uint32             generation    = 3;
+  repeated string    tracks        = 4; // Set while live.
+  ErrorCode          last_error    = 5;
+  bool               data_channels = 6;
+  ViewerRef          controller    = 7; // Unset: nobody.
+  ViewerRef          handover      = 8; // Taking over.
+  repeated ViewerRef waiting       = 9; // In line. The first one is next.
 }
 
 message TrackRef {
@@ -136,13 +167,22 @@ message Subscription {
   uint32 generation = 4; // The device's generation, or microphone_generation.
 }
 
+// A device's data channels in the viewer's PeerConnection.
+message DataSubscription {
+  string               device_id  = 1;
+  uint32               generation = 2;
+  repeated DataChannel channels   = 3;
+  bool                 can_reply  = 4; // Messages sent on them reach the device.
+}
+
 message ViewerJoined {
-  string                viewer_id     = 1;
-  string                room          = 2;
-  bool                  resumed       = 3; // Came back in time with the same id.
-  repeated IceServer    ice_servers   = 4;
-  repeated DeviceInfo   devices       = 5;
-  repeated Subscription subscriptions = 6; // Set when resumed.
+  string                    viewer_id     = 1;
+  string                    room          = 2;
+  bool                      resumed       = 3; // Came back in time with the same id.
+  repeated IceServer        ice_servers   = 4;
+  repeated DeviceInfo       devices       = 5;
+  repeated Subscription     subscriptions = 6; // Set when resumed.
+  repeated DataSubscription data          = 7; // Set when resumed.
 }
 
 // The room's devices changed.
@@ -152,6 +192,7 @@ message Members {
 
 message Subscribe {
   repeated TrackRef tracks = 1;
+  repeated string   data   = 2; // Device ids. Needs data_channels and your own offer answered.
 }
 
 // The SFU's offer for the viewer's PeerConnection. Answer it.
@@ -166,22 +207,42 @@ message SubscribeAnswer {
 }
 
 message Subscribed {
-  repeated Subscription tracks = 1;
+  repeated Subscription     tracks = 1;
+  repeated DataSubscription data   = 2;
 }
 
 // Closing a device's data channels also gives up its control.
 message Unsubscribe {
   repeated string mids = 1;
+  repeated string data = 2; // Device ids.
+}
+
+// Take control of the device, or wait in line.
+message TakeControl {
+  string device_id = 1;
+}
+
+// Give up control or a place in line.
+message ReleaseControl {
+  string device_id = 1;
+}
+
+// Confirms control once Subscribed has can_reply. Send it within 5 s.
+message ControlReady {
+  string device_id = 1;
 }
 
 message Leave {}
 
 message ViewerRequest {
   oneof message {
-    Subscribe       subscribe   = 1;
-    SubscribeAnswer answer      = 2;
-    Unsubscribe     unsubscribe = 3;
-    Leave           leave       = 4;
+    Subscribe       subscribe       = 1;
+    SubscribeAnswer answer          = 2;
+    Unsubscribe     unsubscribe     = 3;
+    Leave           leave           = 4;
+    TakeControl     take_control    = 5;
+    ReleaseControl  release_control = 6;
+    ControlReady    control_ready   = 7;
   }
 }
 
