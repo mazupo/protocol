@@ -195,7 +195,8 @@ message Subscribe {
   repeated string   data   = 2; // Device ids. Needs data_channels and your own offer answered.
 }
 
-// The SFU's offer for the viewer's PeerConnection. Answer it.
+// The SFU's offer (answer it), or the viewer's own offer (the worker returns the SFU's answer).
+// A viewer offers after joined and after session_reset.
 message SubscribeOffer {
   string                sdp           = 1;
   repeated Subscription tracks        = 2;
@@ -243,16 +244,18 @@ message ViewerRequest {
     TakeControl     take_control    = 5;
     ReleaseControl  release_control = 6;
     ControlReady    control_ready   = 7;
+    SubscribeOffer  offer           = 8; // The viewer's own offer.
   }
 }
 
 message ViewerResponse {
   oneof message {
-    ViewerJoined   joined     = 1;
-    DeviceInfo     device     = 2;
-    Members        members    = 3;
-    SubscribeOffer offer      = 4;
-    Subscribed     subscribed = 5;
-    SignalError    error      = 6;
+    ViewerJoined    joined     = 1;
+    DeviceInfo      device     = 2;
+    Members         members    = 3;
+    SubscribeOffer  offer      = 4;
+    Subscribed      subscribed = 5;
+    SignalError     error      = 6;
+    SubscribeAnswer answer     = 7; // The SFU's answer to the viewer's own offer.
   }
 }
