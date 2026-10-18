@@ -183,11 +183,23 @@ message ViewerJoined {
   repeated DeviceInfo       devices       = 5;
   repeated Subscription     subscriptions = 6; // Set when resumed.
   repeated DataSubscription data          = 7; // Set when resumed.
+  repeated ViewerInfo       viewers       = 8; // Everyone, this viewer included.
 }
 
 // The room's devices changed.
 message Members {
   repeated DeviceInfo devices = 1;
+}
+
+message ViewerInfo {
+  string viewer_id     = 1;
+  bool   data_channels = 2; // May take control of devices.
+  bool   away          = 3; // The socket closed. It may come back.
+}
+
+// The room's viewers changed.
+message Viewers {
+  repeated ViewerInfo viewers = 1;
 }
 
 message Subscribe {
@@ -257,5 +269,6 @@ message ViewerResponse {
     Subscribed      subscribed = 5;
     SignalError     error      = 6;
     SubscribeAnswer answer     = 7; // The SFU's answer to the viewer's own offer.
+    Viewers         viewers    = 8;
   }
 }
