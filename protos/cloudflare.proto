@@ -196,7 +196,7 @@ message Subscribe {
 }
 
 // The SFU's offer (answer it), or the viewer's own offer (the worker returns the SFU's answer).
-// A viewer offers after joined and after session_reset.
+// A viewer offers after joined, after session_reset and from a new PeerConnection.
 message SubscribeOffer {
   string                sdp           = 1;
   repeated Subscription tracks        = 2;
