@@ -48,6 +48,7 @@ enum ErrorCode {
   ERROR_CODE_DATA_CHANNELS_OFF = 29; // The token has no data_channels.
   ERROR_CODE_NOT_CONTROLLER    = 30;
   ERROR_CODE_CONTROL_TIMEOUT   = 31; // No control_ready in time.
+  ERROR_CODE_MICROPHONE_LIMIT  = 32;
 }
 
 message SignalError {
@@ -57,6 +58,7 @@ message SignalError {
   string    device_id  = 4;
   string    track_name = 5;
   bool      retryable  = 6;
+  string    viewer_id  = 7;
 }
 
 message IceServer {
@@ -159,12 +161,13 @@ message TrackRef {
   string track_name = 2;
 }
 
-// A device's track in the viewer's PeerConnection.
+// A track in a PeerConnection: a device's track or a viewer's microphone.
 message Subscription {
   string device_id  = 1; // Unset for a microphone.
   string track_name = 2;
   string mid        = 3;
   uint32 generation = 4; // The device's generation, or microphone_generation.
+  string viewer_id  = 5; // Set for a microphone.
 }
 
 // A device's data channels in the viewer's PeerConnection.
@@ -192,9 +195,12 @@ message Members {
 }
 
 message ViewerInfo {
-  string viewer_id     = 1;
-  bool   data_channels = 2; // May take control of devices.
-  bool   away          = 3; // The socket closed. It may come back.
+  string viewer_id             = 1;
+  bool   data_channels         = 2; // May take control of devices.
+  bool   away                  = 3; // The socket closed. It may come back.
+  bool   microphone            = 4;
+  bool   muted                 = 5;
+  uint32 microphone_generation = 6; // Subscribe again when it changes.
 }
 
 // The room's viewers changed.
@@ -203,12 +209,14 @@ message Viewers {
 }
 
 message Subscribe {
-  repeated TrackRef tracks = 1;
-  repeated string   data   = 2; // Device ids. Needs data_channels and your own offer answered.
+  repeated TrackRef tracks      = 1;
+  repeated string   data        = 2; // Device ids. Needs data_channels and your own offer answered.
+  repeated string   microphones = 3; // Viewer ids.
 }
 
 // The SFU's offer (answer it), or the viewer's own offer (the worker returns the SFU's answer).
 // A viewer offers after joined, after session_reset and from a new PeerConnection.
+// To publish its microphone, it sends mute, then an offer with tracks: [{track_name: "microphone", mid}].
 message SubscribeOffer {
   string                sdp           = 1;
   repeated Subscription tracks        = 2;
@@ -245,6 +253,11 @@ message ControlReady {
   string device_id = 1;
 }
 
+// Mute or unmute the microphone. Also send it before the microphone offer.
+message Mute {
+  bool muted = 1;
+}
+
 message Leave {}
 
 message ViewerRequest {
@@ -257,6 +270,7 @@ message ViewerRequest {
     ReleaseControl  release_control = 6;
     ControlReady    control_ready   = 7;
     SubscribeOffer  offer           = 8; // The viewer's own offer.
+    Mute            mute            = 9;
   }
 }
 
