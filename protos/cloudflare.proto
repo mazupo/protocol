@@ -7,11 +7,12 @@ package protocol;
 
 // ── Shared ──────────────────────────────────────────────────────────────────
 
-// WebSocket close codes.
+// WebSocket close codes. Only the same secret can replace a live connection with the same id.
 enum CloseCode {
   CLOSE_CODE_UNSPECIFIED       = 0;
-  CLOSE_CODE_REPLACED          = 4000; // Another connection took this id. Do not reconnect.
+  CLOSE_CODE_REPLACED          = 4000; // A newer connection took this id.
   CLOSE_CODE_HEARTBEAT_TIMEOUT = 4001; // No ping for too long.
+  CLOSE_CODE_ID_IN_USE         = 4002; // A live connection with another secret uses this id.
 }
 
 enum DeviceState {
@@ -185,7 +186,7 @@ message DataSubscription {
 message ViewerJoined {
   string                    viewer_id     = 1;
   string                    room          = 2;
-  bool                      resumed       = 3; // Came back in time with the same id.
+  bool                      resumed       = 3; // Came back in time with the same id and secret.
   repeated IceServer        ice_servers   = 4;
   repeated DeviceInfo       devices       = 5;
   repeated Subscription     subscriptions = 6; // Set when resumed.
