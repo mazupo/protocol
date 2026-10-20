@@ -103,6 +103,7 @@ message PublishOffer {
   string                sdp           = 1;
   repeated PublishTrack tracks        = 2;
   bool                  data_channels = 3; // Open _lossy and _reliable. The offer needs channel "server-events" (id 0).
+  bool                  voices        = 4; // Play the viewers' voices. Answer the worker's offers.
 }
 
 message PublishAnswer {
@@ -125,8 +126,9 @@ message ControlChanged {
 
 message DeviceRequest {
   oneof message {
-    PublishOffer offer = 1;
-    Ready        ready = 2;
+    PublishOffer    offer  = 1;
+    Ready           ready  = 2;
+    SubscribeAnswer answer = 3; // Answer to the worker's offer.
   }
 }
 
@@ -139,6 +141,7 @@ message DeviceResponse {
     SignalError    error    = 5;
     DeviceChannels channels = 6;
     ControlChanged control  = 7;
+    SubscribeOffer offer    = 8; // Offer for the viewers' voices. Answer it.
   }
 }
 
@@ -168,6 +171,7 @@ message Subscription {
   string mid        = 3;
   uint32 generation = 4; // The device's generation, or microphone_generation.
   string viewer_id  = 5; // Set for a microphone.
+  string room       = 6; // Set when a device pulls a microphone.
 }
 
 // A device's data channels in the viewer's PeerConnection.
